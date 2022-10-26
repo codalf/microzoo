@@ -11,7 +11,7 @@ export class Mapper {
         return type.replace("/", "-").toLowerCase();
     }
 
-    public static toUrlProtocol(protocol: string): string {
+    public static toUrlProtocol(protocol: string): string | undefined {
         switch (protocol) {
             case "http-rest":
                 return "http";

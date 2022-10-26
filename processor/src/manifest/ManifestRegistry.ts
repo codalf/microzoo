@@ -50,10 +50,14 @@ export class ManifestRegistry {
         return dirs
           .map(dir => ManifestRegistry.loadComponentSpec(type, dir))
           .filter(spec => spec)
-          .forEach(spec => this.manifests[`${type}s`][spec.name] = spec);
+          .forEach(spec => {
+            if (spec) {
+                this.manifests[`${type}s`][spec.name] = spec;
+            }
+          });
     }
 
-    private static loadComponentSpec(type: string, dir: string): ComponentManifest {
+    private static loadComponentSpec(type: string, dir: string): ComponentManifest | undefined {
         const filepath = `${Constants.COMPONENTS_DIR}/${type}/${dir}/${Constants.CONFIG_YML}`;
         try {
             const content = fs.readFileSync(filepath, 'utf8');
@@ -61,7 +65,6 @@ export class ManifestRegistry {
         }
         catch (error) {
             console.log(`Error reading file from ${filepath}: ${error}`);
-            return undefined;
         }
     }
 }

@@ -1,8 +1,8 @@
 {
     "compilerOptions": {
-        "baseUrl": "src",
+        "baseUrl": ".",
         "target": "es2017",
-        "outDir": ".",
+        "outDir": "dist",
         "lib": [
             "dom",
             "dom.iterable",
@@ -14,11 +14,11 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "forceConsistentCasingInFileNames": true,
-        "module": "ES6",
+        "module": "CommonJS",
         "moduleResolution": "Node",
         "resolveJsonModule": true,
         "isolatedModules": true,
-        "noEmit": true,
+        "noEmit": false,
         "noFallthroughCasesInSwitch": true,
         "types": [
             "node"

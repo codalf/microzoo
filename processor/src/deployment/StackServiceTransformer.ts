@@ -14,7 +14,7 @@ export interface StackService {
     id: string;
     image: string;
     ports?: StackPort[];
-    environment: {[key: string]: string};
+    environment?: {[key: string]: string};
     dependencies?: string[];
 }
 
@@ -28,11 +28,11 @@ export class StackServiceTransformer {
         return [...services, ...databases];
     }
 
-    private getDatabaseByName(name: string): MicrozooDatabase {
+    private getDatabaseByName(name: string): MicrozooDatabase | undefined {
         return this.microzooSystem.databases.find(database => database.name === name);
     }
 
-    private getServiceByName(name: string): MicrozooService {
+    private getServiceByName(name: string): MicrozooService | undefined {
         return this.microzooSystem.services.find(service => service.name === name);
     }
 
@@ -60,9 +60,7 @@ export class StackServiceTransformer {
     private static collectServicePorts(service: MicrozooService, manifest: ComponentManifest): StackPort[] {
         const servicePort = StackServiceTransformer.getServicePort(manifest);
 
-        if (service.interfaces.ports) {
-            return service.interfaces.ports.map(port => ({ targetPort: port.targetPort, sourcePort: port.sourcePort || servicePort}));
-        }
+        return service.interfaces?.ports?.map(port => ({ targetPort: port.targetPort, sourcePort: port.sourcePort || servicePort})) || [];
     }
 
     private static collectDatabasePorts(database: MicrozooDatabase, manifest: ComponentManifest): StackPort[] {
@@ -71,6 +69,8 @@ export class StackServiceTransformer {
         if (database.port) {
             return [{targetPort: database.port.targetPort, sourcePort: database.port.sourcePort || databasePort}];
         }
+
+        return [];
     }
 
     private static getServicePort(manifest: ComponentManifest): string {
@@ -80,6 +80,8 @@ export class StackServiceTransformer {
                 return port;
             }
         }
+
+        return "";
     }
 
     private static getDatabasePort(manifest: ComponentManifest): string {
@@ -87,20 +89,24 @@ export class StackServiceTransformer {
     }
 
     private collectDependencies(service: MicrozooService): string[] {
-        if (service.interfaces.database) {
+        if (service.interfaces?.database) {
             const database = this.getDatabaseByName(service.interfaces.database.database);
-            return [database.id];
+            return database ? [database.id] : [];
         }
+
+        return [];
     }
 
     private collectProfiles(service: MicrozooService, manifest: ComponentManifest): string {
         const profiles = [];
 
-        if (service.interfaces.database) {
+        if (service.interfaces?.database) {
             const database = this.getDatabaseByName(service.interfaces.database.database);
-            const profile = manifest.databases[database.type]?.profile;
-            if (profile) {
-                profiles.push(profile);
+            if (database) {
+                const profile = manifest.databases[database.type]?.profile;
+                if (profile) {
+                    profiles.push(profile);
+                }
             }
         }
         else {
@@ -120,21 +126,23 @@ export class StackServiceTransformer {
     }
 
     private getServiceDatabaseEnvironment(service: MicrozooService, manifest: ComponentManifest): {[key: string]: string} {
-        if (service.interfaces.database) {
+        if (service.interfaces?.database) {
             const database = this.getDatabaseByName(service.interfaces.database.database);
-            const databaseManifest = this.manifestRegistry.getDatabase(database.type);
-            const environment = manifest.databases[database.type]?.environment;
-            if (environment) {
-                const variables = {database: database, manifest: databaseManifest};
-                return this.resolveVariables(environment, variables)
+            if (database) {
+                const databaseManifest = this.manifestRegistry.getDatabase(database.type);
+                const environment = manifest.databases[database.type]?.environment;
+                if (environment) {
+                    const variables = {database: database, manifest: databaseManifest};
+                    return this.resolveVariables(environment, variables)
+                }
             }
         }
 
         return {};
     }
 
-    private getServiceServiceEnvironment(service: MicrozooService): {[key: string]: string} {
-        if (service.interfaces.upstream) {
+    private getServiceServiceEnvironment(service: MicrozooService): {[key: string]: string} | undefined {
+        if (service.interfaces?.upstream) {
             const services = service.interfaces.upstream
               .map(upstreamInterface => this.getServiceUrl(upstreamInterface));
 
@@ -144,13 +152,16 @@ export class StackServiceTransformer {
         }
     }
 
-    private getServiceUrl(upstreamInterface: MicrozooUpstreamInterface): string {
+    private getServiceUrl(upstreamInterface: MicrozooUpstreamInterface): string | undefined {
         const upstreamService = this.getServiceByName(upstreamInterface.service);
-        const manifest = this.manifestRegistry.getService(upstreamService.type);
-        const downstreamInterface = manifest.interfaces.downstream[upstreamInterface.name];
 
-        if (downstreamInterface?.protocol === Mapper.toProtocol(upstreamInterface.type)) {
-            return StackServiceTransformer.getUrl(downstreamInterface.protocol, upstreamService.id, downstreamInterface.port);
+        if (upstreamService) {
+            const manifest = this.manifestRegistry.getService(upstreamService.type);
+            const downstreamInterface = manifest.interfaces.downstream[upstreamInterface.name];
+
+            if (downstreamInterface?.protocol === Mapper.toProtocol(upstreamInterface.type)) {
+                return StackServiceTransformer.getUrl(downstreamInterface.protocol, upstreamService.id, downstreamInterface.port);
+            }
         }
     }
 
@@ -159,7 +170,7 @@ export class StackServiceTransformer {
     }
 
     private getServiceConfigEnvironment(service: MicrozooService): {[key: string]: string} {
-        const environmentConfig = {};
+        const environmentConfig: {[key: string]: string} = {};
 
         if (service.config) {
             Object.keys(service.config).forEach(key => environmentConfig["MICROZOO_" + StringUtil.kebabToSnakeCase(key)] = service.config[key]);
@@ -169,7 +180,7 @@ export class StackServiceTransformer {
     }
 
     private resolveVariables(environment: {[key: string]: string}, variables: object): {[key: string]: string} {
-        const environmentResolved = {};
+        const environmentResolved: {[key: string]: string} = {};
 
         Object.keys(environment).forEach(key => {
             const template = Handlebars.compile(environment[key]);
@@ -179,7 +190,7 @@ export class StackServiceTransformer {
         return environmentResolved;
     }
 
-    private getServiceEnvironment(service: MicrozooService, manifest: ComponentManifest): {[key: string]: string} {
+    private getServiceEnvironment(service: MicrozooService, manifest: ComponentManifest): {[key: string]: string} | undefined {
         let environmentResolved = {
             ...this.getServiceBaseEnvironment(service, manifest),
             ...this.getServiceDatabaseEnvironment(service, manifest),

@@ -20,7 +20,7 @@ interface PodInfo {
 export class KubernetesDeployer implements MicrozooDeployer {
     private readonly deploymentTemplate;
     private readonly serviceTemplate;
-    private services: StackService[];
+    private services: StackService[] = [];
 
     public constructor(private manifestRegistry: ManifestRegistry, private microzooSystem: MicrozooSystem) {
         let templateRaw = fs.readFileSync("./src/deployment/template/kube-deployment.hbs").toString();
@@ -92,9 +92,9 @@ export class KubernetesDeployer implements MicrozooDeployer {
     }
 
     private startPortForwards(): void {
-        const portInfos = [].concat(...this.services
-          .map(service => service.ports
-            .map(port => ({service, port: port}))));
+        const portInfos = this.services
+          .map(service => service.ports?.map(port => ({service, port: port})) || [])
+          .flat();
 
         new PortForwardManager(this.microzooSystem.name).start(portInfos);
     }

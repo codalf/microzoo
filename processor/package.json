@@ -1,0 +1,25 @@
+{
+  "name": "processor",
+  "version": "0.0.1",
+  "description": "the microzoo CLI",
+  "main": "src/build/index.js",
+  "bin": {
+    "microzoo": "./bin/microzoo"
+  },
+  "scripts": {
+    "build-dist": "./node_modules/typescript/bin/tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "codalf",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^18.11.5",
+    "typescript": "^4.8.4"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.7",
+    "js-yaml": "^4.1.0",
+    "puml2json": "^0.9.12",
+    "tree-kill": "^1.2.2"
+  }
+}

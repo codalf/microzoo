@@ -7,25 +7,27 @@ import deploy from "./command/deploy";
 import test from "./command/test";
 import drop from "./command/drop";
 
-function getSourceFolder(program, options): string {
+type Options = {[key: string]: string};
+
+function getSourceFolder(program: Command, options: Options): string {
     return options.sourceFolder || program.opts().sourceFolder;
 }
 
-function getTarget(program, options): string {
-    return options.target || program.opts().target
+function getTarget(program: Command, options: Options): string {
+  return options.target || program.opts().target
 }
 
-function buildCompileCommand(program) {
-    return new Command('compile')
-      .arguments('<source>')
-      .description('compiles a puml specification')
-      .action((source: string, options) => {
-          compile(source, getSourceFolder(program, options), getTarget(program, options))
-            .catch(reason => console.log(reason));
-      });
+function buildCompileCommand(program: Command) {
+  return new Command('compile')
+    .arguments('<source>')
+    .description('compiles a puml specification')
+    .action((source: string, options) => {
+        compile(source, getSourceFolder(program, options), getTarget(program, options))
+          .catch(reason => console.log(reason));
+    });
 }
 
-function buildDeployCommand(program) {
+function buildDeployCommand(program: Command) {
     return new Command('deploy')
       .arguments('<source>')
       .description('compiles, deploys and runs a puml specification')
@@ -35,7 +37,7 @@ function buildDeployCommand(program) {
       });
 }
 
-function buildTestCommand(program) {
+function buildTestCommand(program: Command) {
     return new Command('test')
       .arguments('<source>')
       .description('compiles, deploys, runs and tests a puml specification')
@@ -44,7 +46,7 @@ function buildTestCommand(program) {
             .catch(reason => console.log(reason));
       });
 }
-function buildDropCommand(program) {
+function buildDropCommand(program: Command) {
     return new Command('drop')
       .arguments('<source>')
       .description('drops a deployed system')
@@ -54,14 +56,14 @@ function buildDropCommand(program) {
       });
 }
 
-function start(argv) {
-    const program = new Command();
-    program
+function start(argv: string[]) {
+    const program = new Command()
       .version('0.9.0', '-v, --version', 'output the current version')
       .option('-s, --source-folder <folder>', 'set the source folder', '../scenarios')
       .addOption(new Option('-t, --target <type>', 'set the target system')
-        .choices(["docker-compose", "kubernetes"]).default('docker-compose'))
-      .addCommand(buildCompileCommand(program))
+        .choices(["docker-compose", "kubernetes"]).default('docker-compose'));
+    
+    program.addCommand(buildCompileCommand(program))
       .addCommand(buildDeployCommand(program))
       .addCommand(buildTestCommand(program))
       .addCommand(buildDropCommand(program));

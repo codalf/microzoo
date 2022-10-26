@@ -1,8 +1,7 @@
 import {Readable, Writable} from "stream";
-import {ChildProcess, ChildProcessByStdio} from "child_process";
-const cp = require('child_process')
+import childProcess, {ChildProcess, ChildProcessByStdio} from "child_process";
 
-interface ChildProcessResult {
+export interface ChildProcessResult {
     stdout: string;
     stderr: string;
     exitCode?: number;
@@ -27,7 +26,7 @@ class StreamCollector implements ChildProcessCallbacks {
     private stdout = "";
     private stderr = "";
 
-    constructor(public onExit: (ChildProcessResult) => void = () => {}) {}
+    constructor(public onExit: (result: ChildProcessResult) => void = () => {}) {}
 
     handleStdout(data: Buffer): void {
         this.stdout += data;
@@ -40,9 +39,9 @@ class StreamCollector implements ChildProcessCallbacks {
     handleClose(exitCode: number): void {
         if (exitCode) {
             const error = new Error('Shell command exit with non zero code: ' + exitCode)
-            this.onExit({stdout: this.stdout, stdErr: this.stderr, exitCode: exitCode, error});
+            this.onExit({stdout: this.stdout, stderr: this.stderr, exitCode: exitCode, error});
         } else {
-            this.onExit({stdout: this.stdout, stdErr: this.stderr, exitCode: 0});
+            this.onExit({stdout: this.stdout, stderr: this.stderr, exitCode: 0});
         }
     }
 }
@@ -73,7 +72,7 @@ function getShell(): {cmd: string, arg: string} {
  * @param {Object} [callbacks]
  * @returns {ChildProcess}
  */
-function spawn(command: string[] | string, options: {stdio: string} | boolean, callbacks: ChildProcessCallbacks = new NoOpCallbacks()): ChildProcessByStdio<Writable, Readable, Readable> {
+function spawn(command: string[] | string, options: {stdio: string | null} | boolean, callbacks: ChildProcessCallbacks = new NoOpCallbacks()): ChildProcessByStdio<Writable, Readable, Readable> | undefined {
     function initEventHandlers(child: ChildProcess): void {
         child.stdout?.on('data', (data: Buffer) => callbacks.handleStdout(data));
         child.stderr?.on('data', (data: Buffer) => callbacks.handleStderr(data));
@@ -93,7 +92,7 @@ function spawn(command: string[] | string, options: {stdio: string} | boolean, c
 
     try {
         const shell = getShell();
-        const child = cp.spawn(shell.cmd, [shell.arg, command], options);
+        const child = childProcess.spawn(shell.cmd, [shell.arg, command], options);
         initEventHandlers(child);
         return child;
     }
@@ -103,7 +102,7 @@ function spawn(command: string[] | string, options: {stdio: string} | boolean, c
 }
 
 namespace spawn {
-    export function promise(command, options): Promise<ChildProcessResult> {
+    export function promise(command: string | string[], options: {stdio: string | null} | boolean): Promise<ChildProcessResult> {
         return new Promise<ChildProcessResult>((resolve, reject) => {
             spawn(command, options, new StreamCollector(result => {
                 if (result.error) {

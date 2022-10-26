@@ -15,11 +15,11 @@ interface MicrozooSystemConstructable {
 export class DeployerFactory {
     protected static deployers: {[target: string]: (manifestRegistry: ManifestRegistry, microzoosystem: MicrozooSystem) =>  MicrozooDeployer} = {};
 
-    public static register<T extends MicrozooDeployer>(target: string, type: MicrozooSystemConstructable) {
+    public static register(target: string, type: MicrozooSystemConstructable) {
         DeployerFactory.deployers[target] = (manifestRegistry, microzoosystem) => new type(manifestRegistry, microzoosystem);
     }
 
-    public static get(target: string, manifestRegistry?: ManifestRegistry, microzooSystem?: MicrozooSystem): MicrozooDeployer {
+    public static get(target: string, manifestRegistry: ManifestRegistry, microzooSystem: MicrozooSystem): MicrozooDeployer {
         return DeployerFactory.deployers[target]?.(manifestRegistry, microzooSystem);
     }
 }
