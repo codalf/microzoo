@@ -115,7 +115,7 @@ See the [microzoo extension guide](doc/extension_guide.md) for details.
 
 ## License
 
-Copyright 2021 Peter Kullmann, [iteratec GmbH](https://www.iteratec.com)
+Copyright 2021 Peter Kullmann
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this work except in compliance with the License.
