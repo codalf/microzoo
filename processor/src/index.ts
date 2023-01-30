@@ -1,57 +1,51 @@
 import {DeployerFactory} from "./deployment/MicrozooDeployer";
-import {Command, Option} from 'commander';
+import {Command, Option, OptionValues} from 'commander';
 import {DockerComposeDeployer} from "./deployment/DockerComposeDeployer";
 import {KubernetesDeployer} from "./deployment/KubernetesDeployer";
+import {setGlobalConfig} from "./config/globalConfig";
+import * as fs from "fs";
 import compile from "./command/compile";
 import deploy from "./command/deploy";
 import test from "./command/test";
 import drop from "./command/drop";
 
-type Options = {[key: string]: string};
+type OptionGetter = (options: OptionValues, key: string) => string;
 
-function getSourceFolder(program: Command, options: Options): string {
-    return options.sourceFolder || program.opts().sourceFolder;
-}
-
-function getTarget(program: Command, options: Options): string {
-  return options.target || program.opts().target
-}
-
-function buildCompileCommand(program: Command) {
+function buildCompileCommand(getOption: OptionGetter) {
   return new Command('compile')
     .arguments('<source>')
     .description('compiles a puml specification')
     .action((source: string, options) => {
-        compile(source, getSourceFolder(program, options), getTarget(program, options))
+        compile(source, getOption(options, "sourceFolder"), getOption(options, "target"))
           .catch(reason => console.log(reason));
     });
 }
 
-function buildDeployCommand(program: Command) {
+function buildDeployCommand(getOption: OptionGetter) {
     return new Command('deploy')
       .arguments('<source>')
       .description('compiles, deploys and runs a puml specification')
       .action((source: string, options) => {
-          deploy(source, getSourceFolder(program, options), getTarget(program, options))
+          deploy(source, getOption(options, "sourceFolder"), getOption(options, "target"))
             .catch(reason => console.log(reason));
       });
 }
 
-function buildTestCommand(program: Command) {
+function buildTestCommand(getOption: OptionGetter) {
     return new Command('test')
       .arguments('<source>')
       .description('compiles, deploys, runs and tests a puml specification')
       .action((source: string, options) => {
-          test(source, getSourceFolder(program, options), getTarget(program, options))
+          test(source, getOption(options, "sourceFolder"), getOption(options, "target"))
             .catch(reason => console.log(reason));
       });
 }
-function buildDropCommand(program: Command) {
+function buildDropCommand(getOption: OptionGetter) {
     return new Command('drop')
       .arguments('<source>')
       .description('drops a deployed system')
       .action((source: string, options) => {
-          drop(source, getSourceFolder(program, options), getTarget(program, options))
+          drop(source, getOption(options, "sourceFolder"), getOption(options, "target"))
             .catch(reason => console.log(reason));
       });
 }
@@ -61,12 +55,23 @@ function start(argv: string[]) {
       .version('0.9.0', '-v, --version', 'output the current version')
       .option('-s, --source-folder <folder>', 'set the source folder', '../scenarios')
       .addOption(new Option('-t, --target <type>', 'set the target system')
-        .choices(["docker-compose", "kubernetes"]).default('docker-compose'));
-    
-    program.addCommand(buildCompileCommand(program))
-      .addCommand(buildDeployCommand(program))
-      .addCommand(buildTestCommand(program))
-      .addCommand(buildDropCommand(program));
+        .choices(["docker-compose", "kubernetes"]).default('docker-compose'))
+      .option('-c, --config-file <file>', 'set the config file', './config.json');
+
+    const getOption = (options: OptionValues, key: string): string => {
+        return options[key] || program.opts()[key];
+    }  
+      
+    program.addCommand(buildCompileCommand(getOption))
+      .addCommand(buildDeployCommand(getOption))
+      .addCommand(buildTestCommand(getOption))
+      .addCommand(buildDropCommand(getOption));
+
+    program.hook('preAction', () => {
+      const configFile = fs.readFileSync(program.opts().configFile).toString();
+      setGlobalConfig(JSON.parse(configFile));
+    });
+
     program.parse(argv);
 }
 

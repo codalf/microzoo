@@ -10,6 +10,7 @@ note bottom of "myService" {
     type: spring-boot
     request-delay: 5ms
     response-delay: 10ms
+    replicas: 3
 }
 
 interface "port: 8080"

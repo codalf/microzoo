@@ -5,6 +5,7 @@ import {MicrozooDeployer} from "./MicrozooDeployer";
 import {MicrozooSystem} from "../model/MicrozooSystem";
 import {ManifestRegistry} from "../manifest/ManifestRegistry";
 import {StackServiceTransformer} from "./StackServiceTransformer";
+import {getGlobalConfig} from "../config/globalConfig";
 import spawn from "../common/spawn";
 
 export class DockerComposeDeployer implements MicrozooDeployer {
@@ -50,14 +51,14 @@ export class DockerComposeDeployer implements MicrozooDeployer {
     }
 
     private async startDockerCompose(): Promise<any> {
-        return spawn.promise(`docker-compose -f ../stacks/${this.microzooSystem.name}/docker-compose/docker-compose.yml up -d --remove-orphans`, true);
+        return spawn.promise(`${getGlobalConfig()["compose-cli"]} -f ../stacks/${this.microzooSystem.name}/docker-compose/docker-compose.yml up -d --remove-orphans`, true);
     }
 
     private async dropDockerCompose(): Promise<any> {
-        return spawn.promise(`docker-compose -f ../stacks/${this.microzooSystem.name}/docker-compose/docker-compose.yml down`, true);
+        return spawn.promise(`${getGlobalConfig()["compose-cli"]} -f ../stacks/${this.microzooSystem.name}/docker-compose/docker-compose.yml down`, true);
     }
 
     private async execK6(): Promise<any> {
-        return spawn.promise(`docker run -i --rm loadimpact/k6 run - <../stacks/${this.microzooSystem.name}/tester/k6/script.js`, true)
+        return spawn.promise(`${getGlobalConfig()["container-cli"]} run -i --rm loadimpact/k6 run - <../stacks/${this.microzooSystem.name}/tester/k6/script.js`, true)
     }
 }

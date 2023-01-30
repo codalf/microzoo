@@ -1,0 +1,4 @@
+{
+    "container-cli": "docker",
+    "compose-cli": "docker compose"
+}

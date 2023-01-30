@@ -16,6 +16,7 @@ export interface StackService {
     ports?: StackPort[];
     environment?: {[key: string]: string};
     dependencies?: string[];
+    replicas?: number;
 }
 
 export class StackServiceTransformer {
@@ -43,7 +44,8 @@ export class StackServiceTransformer {
             image: manifest.docker.image,
             ports: StackServiceTransformer.collectServicePorts(service, manifest),
             environment: this.getServiceEnvironment(service, manifest),
-            dependencies: this.collectDependencies(service)
+            dependencies: this.collectDependencies(service),
+            replicas: parseInt(service.config.replicas || "1")
         };
     }
 

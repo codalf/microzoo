@@ -6,7 +6,7 @@ metadata:
     microzoo.service: {{id}}
   name: {{id}}-deployment
 spec:
-  replicas: 1
+  replicas: {{replicas}}
   selector:
     matchLabels:
       microzoo.service: {{id}}
