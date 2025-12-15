@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,16 +11,23 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq" // PostgreSQL-Treiber
 	"github.com/spf13/viper"
 )
 
 // MicrozooConfigProperties entspricht der Konfiguration aus der Java-Anwendung
 type MicrozooConfigProperties struct {
-	RequestDelay   time.Duration
-	ResponseDelay  time.Duration
+	RequestDelay     time.Duration
+	ResponseDelay    time.Duration
 	UpstreamServices []string
-	EntityCount    int
-	PayloadSize    int
+	EntityCount      int
+	PayloadSize      int
+	// Datenbank-Konfiguration
+	DBHost string
+	DBPort string
+	DBName string
+	DBUser string
+	DBPass string
 }
 
 // BaseDto entspricht der Datenstruktur aus der Java-Anwendung
@@ -30,8 +38,10 @@ type BaseDto struct {
 }
 
 var config MicrozooConfigProperties
+var db *sql.DB
 
 func loadConfig() {
+	// ... (Unveränderte Konfigurationslogik) ...
 	viper.SetDefault("microzoo.requestDelay", "0ms")
 	viper.SetDefault("microzoo.responseDelay", "0ms")
 	viper.SetDefault("microzoo.entityCount", 1)
@@ -98,7 +108,51 @@ func loadConfig() {
 		config.PayloadSize = 100
 	}
 
+	// Datenbank-Konfiguration
+	config.DBHost = viper.GetString("DB_HOST")
+	config.DBPort = viper.GetString("DB_PORT")
+	config.DBName = viper.GetString("DB_NAME")
+	config.DBUser = viper.GetString("DB_USER")
+	config.DBPass = viper.GetString("DB_PASS")
+
 	log.Printf("Konfiguration geladen: %+v", config)
+}
+
+func initDB() {
+	if config.DBHost == "" {
+		log.Println("INFO: Keine Datenbank-Konfiguration gefunden. Datenbank-Funktionalität deaktiviert.")
+		return
+	}
+
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		config.DBHost, config.DBPort, config.DBUser, config.DBPass, config.DBName)
+
+	var err error
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("FEHLER: Konnte keine Verbindung zur Datenbank herstellen: %v", err)
+	}
+
+	// Testen der Verbindung
+	err = db.Ping()
+	if err != nil {
+		log.Fatalf("FEHLER: Datenbank-Ping fehlgeschlagen: %v", err)
+	}
+
+	log.Println("INFO: Datenbankverbindung erfolgreich hergestellt.")
+
+	// Tabelle erstellen, falls nicht vorhanden (analog zu Liquibase/JPA-Auto-Create)
+	createTableSQL := `
+	CREATE TABLE IF NOT EXISTS base (
+		id VARCHAR(255) PRIMARY KEY,
+		name VARCHAR(255),
+		payload TEXT
+	);`
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		log.Fatalf("FEHLER: Konnte Tabelle nicht erstellen: %v", err)
+	}
+	log.Println("INFO: Tabelle 'base' erstellt oder existiert bereits.")
 }
 
 func generateBaseDto(id int) BaseDto {
@@ -110,50 +164,83 @@ func generateBaseDto(id int) BaseDto {
 	}
 }
 
+func isDBActive() bool {
+	return db != nil
+}
+
+func getAllFromDB() ([]BaseDto, error) {
+	log.Println("Fetching entities from database")
+	rows, err := db.Query("SELECT id, name, payload FROM base")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dtos []BaseDto
+	for rows.Next() {
+		var dto BaseDto
+		if err := rows.Scan(&dto.ID, &dto.Name, &dto.Payload); err != nil {
+			return nil, err
+		}
+		dtos = append(dtos, dto)
+	}
+	return dtos, nil
+}
+
+func saveToDB(dto BaseDto) (BaseDto, error) {
+	log.Printf("Saving entity with id %s in database", dto.ID)
+	insertSQL := `INSERT INTO base (id, name, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET name = $2, payload = $3`
+	_, err := db.Exec(insertSQL, dto.ID, dto.Name, dto.Payload)
+	if err != nil {
+		return BaseDto{}, err
+	}
+	return dto, nil
+}
+
 func getAll(c *gin.Context) {
 	log.Println("Entered GET /api/base")
 	time.Sleep(config.RequestDelay)
 
-	// Simuliere die Logik aus BaseService.java
-	// Da wir keine Datenbank haben, simulieren wir nur die "No-Database"-Logik und Upstream-Aufrufe
+	var result []BaseDto
+	var err error
 
-	// 1. Fall: Upstream-Services sind konfiguriert
-	if len(config.UpstreamServices) > 0 {
+	// 1. Fall: Datenbank ist aktiv
+	if isDBActive() {
+		result, err = getAllFromDB()
+		if err != nil {
+			log.Printf("FEHLER beim Abrufen aus DB: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
+		}
+	} else if len(config.UpstreamServices) > 0 {
+		// 2. Fall: Upstream-Services sind konfiguriert
 		log.Println("Fetching entities from upstream services")
 		var dtos []BaseDto
-		
-		// Hier müsste die Logik für FeignClients/HTTP-Aufrufe zu Upstream-Services implementiert werden.
-		// Für diese Demonstration wird dies vereinfacht und nur die Struktur gezeigt.
-		// In einer vollständigen Implementierung würde man hier HTTP-Clients verwenden.
 		
 		// Simuliere den Aufruf und die Aggregation
 		for _, serviceURL := range config.UpstreamServices {
 			log.Printf("Delegating call to %s/api/base", serviceURL)
 			// Echter HTTP-Aufruf würde hier erfolgen
-			// Für die Demo geben wir einfach ein Dummy-Ergebnis zurück
 			dtos = append(dtos, BaseDto{
 				ID: fmt.Sprintf("upstream-%s-1", serviceURL),
 				Name: fmt.Sprintf("Upstream Entity from %s", serviceURL),
 				Payload: strings.Repeat("y", config.PayloadSize),
 			})
 		}
-		
-		time.Sleep(config.ResponseDelay)
-		log.Println("Exiting GET /api/base (Upstream)")
-		c.JSON(http.StatusOK, dtos)
-		return
-	}
-
-	// 2. Fall: Keine Datenbank, keine Upstream-Services (Generierung von Dummy-Daten)
-	log.Println("Generating dummy entities")
-	var dtos []BaseDto
-	for i := 1; i <= config.EntityCount; i++ {
-		dtos = append(dtos, generateBaseDto(i))
+		result = dtos
+	} else {
+		// 3. Fall: Keine Datenbank, keine Upstream-Services (Generierung von Dummy-Daten)
+		log.Println("Generating dummy entities")
+		var dtos []BaseDto
+		for i := 1; i <= config.EntityCount; i++ {
+			dtos = append(dtos, generateBaseDto(i))
+		}
+		result = dtos
 	}
 
 	time.Sleep(config.ResponseDelay)
-	log.Println("Exiting GET /api/base (Dummy)")
-	c.JSON(http.StatusOK, dtos)
+	log.Println("Exiting GET /api/base")
+	c.JSON(http.StatusOK, result)
 }
 
 func create(c *gin.Context) {
@@ -166,34 +253,40 @@ func create(c *gin.Context) {
 		return
 	}
 
-	// Simuliere die Logik aus BaseService.java
-	// 1. Fall: Upstream-Services sind konfiguriert
-	if len(config.UpstreamServices) > 0 {
+	var result BaseDto
+	var err error
+
+	// 1. Fall: Datenbank ist aktiv
+	if isDBActive() {
+		result, err = saveToDB(baseDto)
+		if err != nil {
+			log.Printf("FEHLER beim Speichern in DB: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			return
+		}
+	} else if len(config.UpstreamServices) > 0 {
+		// 2. Fall: Upstream-Services sind konfiguriert
 		log.Printf("Posting dto with id %s to upstream services", baseDto.ID)
-		
-		// Hier müsste die Logik für FeignClients/HTTP-Aufrufe zu Upstream-Services implementiert werden.
-		// Für diese Demonstration wird dies vereinfacht.
 		
 		// Simuliere den Aufruf und die Rückgabe
 		for _, serviceURL := range config.UpstreamServices {
 			log.Printf("Posting dto with id %s to service %s", baseDto.ID, serviceURL)
 			// Echter HTTP-Aufruf würde hier erfolgen
 		}
-		
-		time.Sleep(config.ResponseDelay)
-		log.Println("Exiting POST /api/base (Upstream)")
-		c.JSON(http.StatusCreated, baseDto)
-		return
+		result = baseDto
+	} else {
+		// 3. Fall: Keine Datenbank, keine Upstream-Services (einfache Rückgabe)
+		result = baseDto
 	}
 
-	// 2. Fall: Keine Datenbank, keine Upstream-Services (einfache Rückgabe)
 	time.Sleep(config.ResponseDelay)
-	log.Println("Exiting POST /api/base (No-DB)")
-	c.JSON(http.StatusCreated, baseDto)
+	log.Println("Exiting POST /api/base")
+	c.JSON(http.StatusCreated, result)
 }
 
 func main() {
 	loadConfig()
+	initDB() // Initialisiere die Datenbankverbindung
 
 	// Gin im Release-Modus für weniger Log-Ausgabe
 	gin.SetMode(gin.ReleaseMode)
