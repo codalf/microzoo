@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -13,6 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq" // PostgreSQL-Treiber
 	"github.com/spf13/viper"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // MicrozooConfigProperties entspricht der Konfiguration aus der Java-Anwendung
@@ -23,22 +27,27 @@ type MicrozooConfigProperties struct {
 	EntityCount      int
 	PayloadSize      int
 	// Datenbank-Konfiguration
-	DBHost string
-	DBPort string
-	DBName string
-	DBUser string
-	DBPass string
+	DBHost string // Für PostgreSQL
+	DBPort string // Für PostgreSQL
+	DBName string // Für PostgreSQL
+	DBUser string // Für PostgreSQL
+	DBPass string // Für PostgreSQL
+	// MongoDB-Konfiguration
+	MongoURI   string
+	MongoDBName string
 }
 
 // BaseDto entspricht der Datenstruktur aus der Java-Anwendung
 type BaseDto struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Payload string `json:"payload"`
+	ID      string `json:"id" bson:"_id"`
+	Name    string `json:"name" bson:"name"`
+	Payload string `json:"payload" bson:"payload"`
 }
 
 var config MicrozooConfigProperties
-var db *sql.DB
+var sqlDB *sql.DB
+var mongoClient *mongo.Client
+var mongoCollection *mongo.Collection
 
 func loadConfig() {
 	// ... (Unveränderte Konfigurationslogik) ...
@@ -108,51 +117,81 @@ func loadConfig() {
 		config.PayloadSize = 100
 	}
 
-	// Datenbank-Konfiguration
+	// Datenbank-Konfiguration (PostgreSQL)
 	config.DBHost = viper.GetString("DB_HOST")
 	config.DBPort = viper.GetString("DB_PORT")
 	config.DBName = viper.GetString("DB_NAME")
 	config.DBUser = viper.GetString("DB_USER")
 	config.DBPass = viper.GetString("DB_PASS")
 
+	// MongoDB-Konfiguration
+	config.MongoURI = viper.GetString("MONGO_URI")
+	config.MongoDBName = viper.GetString("MONGO_DBNAME")
+
 	log.Printf("Konfiguration geladen: %+v", config)
 }
 
 func initDB() {
-	if config.DBHost == "" {
-		log.Println("INFO: Keine Datenbank-Konfiguration gefunden. Datenbank-Funktionalität deaktiviert.")
+	// 1. MongoDB-Initialisierung
+	if config.MongoURI != "" && config.MongoDBName != "" {
+		log.Println("INFO: MongoDB-Konfiguration gefunden. Versuche Verbindung...")
+		clientOptions := options.Client().ApplyURI(config.MongoURI)
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		var err error
+		mongoClient, err = mongo.Connect(ctx, clientOptions)
+		if err != nil {
+			log.Fatalf("FEHLER: Konnte keine Verbindung zu MongoDB herstellen: %v", err)
+		}
+
+		err = mongoClient.Ping(ctx, nil)
+		if err != nil {
+			log.Fatalf("FEHLER: MongoDB-Ping fehlgeschlagen: %v", err)
+		}
+
+		mongoCollection = mongoClient.Database(config.MongoDBName).Collection("base")
+		log.Println("INFO: MongoDB-Verbindung erfolgreich hergestellt.")
 		return
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		config.DBHost, config.DBPort, config.DBUser, config.DBPass, config.DBName)
+	// 2. PostgreSQL-Initialisierung (Fallback)
+	if config.DBHost != "" {
+		log.Println("INFO: PostgreSQL-Konfiguration gefunden. Versuche Verbindung...")
+		connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+			config.DBHost, config.DBPort, config.DBUser, config.DBPass, config.DBName)
 
-	var err error
-	db, err = sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("FEHLER: Konnte keine Verbindung zur Datenbank herstellen: %v", err)
+		var err error
+		sqlDB, err = sql.Open("postgres", connStr)
+		if err != nil {
+			log.Fatalf("FEHLER: Konnte keine Verbindung zur Datenbank herstellen: %v", err)
+		}
+
+		// Testen der Verbindung
+		err = sqlDB.Ping()
+		if err != nil {
+			log.Fatalf("FEHLER: Datenbank-Ping fehlgeschlagen: %v", err)
+		}
+
+		log.Println("INFO: PostgreSQL-Verbindung erfolgreich hergestellt.")
+
+		// Tabelle erstellen, falls nicht vorhanden
+		createTableSQL := `
+		CREATE TABLE IF NOT EXISTS base (
+			id VARCHAR(255) PRIMARY KEY,
+			name VARCHAR(255),
+			payload TEXT
+		);`
+		_, err = sqlDB.Exec(createTableSQL)
+		if err != nil {
+			log.Fatalf("FEHLER: Konnte Tabelle nicht erstellen: %v", err)
+		}
+		log.Println("INFO: Tabelle 'base' erstellt oder existiert bereits.")
+		return
 	}
 
-	// Testen der Verbindung
-	err = db.Ping()
-	if err != nil {
-		log.Fatalf("FEHLER: Datenbank-Ping fehlgeschlagen: %v", err)
-	}
-
-	log.Println("INFO: Datenbankverbindung erfolgreich hergestellt.")
-
-	// Tabelle erstellen, falls nicht vorhanden (analog zu Liquibase/JPA-Auto-Create)
-	createTableSQL := `
-	CREATE TABLE IF NOT EXISTS base (
-		id VARCHAR(255) PRIMARY KEY,
-		name VARCHAR(255),
-		payload TEXT
-	);`
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		log.Fatalf("FEHLER: Konnte Tabelle nicht erstellen: %v", err)
-	}
-	log.Println("INFO: Tabelle 'base' erstellt oder existiert bereits.")
+	log.Println("INFO: Keine Datenbank-Konfiguration gefunden. Datenbank-Funktionalität deaktiviert.")
 }
 
 func generateBaseDto(id int) BaseDto {
@@ -165,12 +204,14 @@ func generateBaseDto(id int) BaseDto {
 }
 
 func isDBActive() bool {
-	return db != nil
+	return sqlDB != nil || mongoClient != nil
 }
 
-func getAllFromDB() ([]BaseDto, error) {
-	log.Println("Fetching entities from database")
-	rows, err := db.Query("SELECT id, name, payload FROM base")
+// --- SQL (PostgreSQL) Logik ---
+
+func getAllFromSQL() ([]BaseDto, error) {
+	log.Println("Fetching entities from PostgreSQL")
+	rows, err := sqlDB.Query("SELECT id, name, payload FROM base")
 	if err != nil {
 		return nil, err
 	}
@@ -187,15 +228,54 @@ func getAllFromDB() ([]BaseDto, error) {
 	return dtos, nil
 }
 
-func saveToDB(dto BaseDto) (BaseDto, error) {
-	log.Printf("Saving entity with id %s in database", dto.ID)
+func saveToSQL(dto BaseDto) (BaseDto, error) {
+	log.Printf("Saving entity with id %s in PostgreSQL", dto.ID)
 	insertSQL := `INSERT INTO base (id, name, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET name = $2, payload = $3`
-	_, err := db.Exec(insertSQL, dto.ID, dto.Name, dto.Payload)
+	_, err := sqlDB.Exec(insertSQL, dto.ID, dto.Name, dto.Payload)
 	if err != nil {
 		return BaseDto{}, err
 	}
 	return dto, nil
 }
+
+// --- MongoDB Logik ---
+
+func getAllFromMongo() ([]BaseDto, error) {
+	log.Println("Fetching entities from MongoDB")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := mongoCollection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var dtos []BaseDto
+	if err = cursor.All(ctx, &dtos); err != nil {
+		return nil, err
+	}
+	return dtos, nil
+}
+
+func saveToMongo(dto BaseDto) (BaseDto, error) {
+	log.Printf("Saving entity with id %s in MongoDB", dto.ID)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// MongoDB verwendet Upsert für das Speichern/Aktualisieren
+	filter := bson.M{"_id": dto.ID}
+	update := bson.M{"$set": dto}
+	opts := options.Update().SetUpsert(true)
+
+	_, err := mongoCollection.UpdateOne(ctx, filter, update, opts)
+	if err != nil {
+		return BaseDto{}, err
+	}
+	return dto, nil
+}
+
+// --- Controller Logik ---
 
 func getAll(c *gin.Context) {
 	log.Println("Entered GET /api/base")
@@ -206,7 +286,12 @@ func getAll(c *gin.Context) {
 
 	// 1. Fall: Datenbank ist aktiv
 	if isDBActive() {
-		result, err = getAllFromDB()
+		if mongoClient != nil {
+			result, err = getAllFromMongo()
+		} else if sqlDB != nil {
+			result, err = getAllFromSQL()
+		}
+
 		if err != nil {
 			log.Printf("FEHLER beim Abrufen aus DB: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
@@ -258,7 +343,12 @@ func create(c *gin.Context) {
 
 	// 1. Fall: Datenbank ist aktiv
 	if isDBActive() {
-		result, err = saveToDB(baseDto)
+		if mongoClient != nil {
+			result, err = saveToMongo(baseDto)
+		} else if sqlDB != nil {
+			result, err = saveToSQL(baseDto)
+		}
+
 		if err != nil {
 			log.Printf("FEHLER beim Speichern in DB: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
