@@ -1,7 +1,13 @@
-name: go
-description: reference service written in golang
+name: golang
+description: reference service written in go
 docker:
-  image: microzoo-go
+  image: microzoo-go # Behalte den vorhandenen Image-Namen
+  environment:
+    # Go-Service verwendet Umgebungsvariablen direkt
+    MICROZOO_REQUESTDELAY: "{{config.requestDelay}}"
+    MICROZOO_RESPONSEDELAY: "{{config.responseDelay}}"
+    MICROZOO_ENTITYCOUNT: "{{config.entityCount}}"
+    MICROZOO_PAYLOADSIZE: "{{config.payloadSize}}"
 interfaces:
   downstream:
     base:
@@ -10,8 +16,8 @@ interfaces:
   upstream:
     base:
       protocol: http-rest
-databases:
-  - mysql
 config:
   requestDelay: string
   responseDelay: string
+  entityCount: number
+  payloadSize: number

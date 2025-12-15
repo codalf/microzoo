@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Dieses Skript wartet auf alle Upstream-Services, bevor es den Go-Service startet.
+# Es ist analog zum Skript im spring-boot-service.
+
+set -e
+
+# Extrahiere die Upstream-Services aus der Umgebungsvariable
+UPSTREAM_SERVICES=$(echo $MICROZOO_UPSTREAMSERVICES | tr ',' ' ')
+
+# Warte auf jeden Upstream-Service
+for service in $UPSTREAM_SERVICES; do
+  # Extrahiere Host und Port. Gehe davon aus, dass die URL das Format http://host:port hat.
+  HOST_PORT=$(echo $service | sed -e 's/^http:\/\///' -e 's/^https:\/\///')
+  HOST=$(echo $HOST_PORT | cut -d: -f1)
+  PORT=$(echo $HOST_PORT | cut -d: -f2)
+
+  if [ -n "$HOST" ] && [ -n "$PORT" ]; then
+    echo "Warte auf Upstream-Service: $HOST:$PORT"
+    # Verwende das wait-for Skript, das wir auch kopieren werden
+    /app/wait-for $HOST:$PORT -t 60
+  fi
+done
+
+echo "Alle Upstream-Services sind verfügbar. Starte Go-Service..."
+
+# Starte die Go-Anwendung
+exec /app/go-service
