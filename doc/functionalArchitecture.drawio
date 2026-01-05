@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram id="Microzoo_Architecture" name="Microzoo System Summary">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Inputs -->
+        <mxCell id="node_scenarios" value="&lt;b&gt;Scenarios (.puml)&lt;/b&gt;&lt;br/&gt;PlantUML files describing&lt;br/&gt;microservice architecture." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="280" y="20" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- CLI Entry -->
+        <mxCell id="node_cli" value="&lt;b&gt;CLI Entry (index.ts)&lt;/b&gt;&lt;br/&gt;Commander-based entry&lt;br/&gt;point for all commands." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="280" y="120" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Commands -->
+        <mxCell id="node_commands" value="&lt;b&gt;Command Handlers&lt;/b&gt;&lt;br/&gt;compile, deploy,&lt;br/&gt;test, drop." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="280" y="220" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Registry -->
+        <mxCell id="node_registry" value="&lt;b&gt;Manifest Registry&lt;/b&gt;&lt;br/&gt;Loads and manages&lt;br/&gt;component data from&lt;br/&gt;the components/ folder." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="520" y="220" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Validators -->
+        <mxCell id="node_validators" value="&lt;b&gt;Validators&lt;/b&gt;&lt;br/&gt;Validates PUML structure&lt;br/&gt;and the transformed&lt;br/&gt;internal model." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="40" y="220" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Transformer -->
+        <mxCell id="node_transformer" value="&lt;b&gt;PumlTransformer&lt;/b&gt;&lt;br/&gt;Converts raw PUML models&lt;br/&gt;into refined MicrozooSystem&lt;br/&gt;data structures." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="280" y="320" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Deployer Factory -->
+        <mxCell id="node_deployer" value="&lt;b&gt;MicrozooDeployer (IF)&lt;/b&gt;&lt;br/&gt;Abstraction for target&lt;br/&gt;deployments (Compose/K8s)." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="280" y="430" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Implementations -->
+        <mxCell id="node_docker" value="&lt;b&gt;DockerComposeDeployer&lt;/b&gt;&lt;br/&gt;Generates compose files&lt;br/&gt;and executes docker-compose." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="160" y="530" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="node_k8s" value="&lt;b&gt;KubernetesDeployer&lt;/b&gt;&lt;br/&gt;Generates K8s manifests&lt;br/&gt;and manages kubectl/helm." style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="390" y="530" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Outputs -->
+        <mxCell id="node_stacks" value="&lt;b&gt;Stacks Folder&lt;/b&gt;&lt;br/&gt;Output directory for&lt;br/&gt;generated deployment files." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="280" y="640" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="edge1" source="node_scenarios" target="node_cli" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge2" source="node_cli" target="node_commands" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge3" source="node_commands" target="node_validators" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge4" source="node_commands" target="node_registry" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge5" source="node_commands" target="node_transformer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge6" source="node_transformer" target="node_registry" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge7" source="node_transformer" target="node_deployer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge8" source="node_deployer" target="node_docker" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge9" source="node_deployer" target="node_k8s" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge10" source="node_docker" target="node_stacks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge11" source="node_k8s" target="node_stacks" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
