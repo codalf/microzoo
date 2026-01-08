@@ -16,6 +16,20 @@ interfaces:
   upstream:
     base:
       protocol: http-rest
+databases:
+  postgres:
+    environment:
+      MICROZOO_DB_HOST: "{{database.id}}"
+      MICROZOO_DB_PORT: "{{manifest.constants.port}}"
+      MICROZOO_DB_NAME: "{{manifest.constants.db}}"
+      MICROZOO_DB_USER: "{{manifest.constants.userName}}"
+      MICROZOO_DB_PASS: "{{manifest.constants.password}}"
+      WAIT_FOR: "{{database.id}}:{{manifest.constants.port}}"
+  mongodb:
+    environment:
+      MICROZOO_MONGO_URI: "mongodb://{{database.id}}:{{manifest.constants.port}}"
+      MICROZOO_MONGO_DBNAME: "{{manifest.constants.db}}"
+      WAIT_FOR: "{{database.id}}:{{manifest.constants.port}}"
 config:
   requestDelay: string
   responseDelay: string
